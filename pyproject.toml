@@ -1,0 +1,85 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "create-mcp"
+version = "0.1.0"
+description = "The create-next-app for production MCP servers — scaffold a typed, tested, auth-ready Python MCP server in one command."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Blaze", email = "hello@blaze.uz" }]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "fastmcp",
+    "scaffold",
+    "generator",
+    "cli",
+    "fastapi",
+    "oauth",
+    "ai",
+    "agents",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+    "Typing :: Typed",
+]
+dependencies = [
+    "typer>=0.15",
+    "rich>=13.7",
+    "jinja2>=3.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/blaze-uz/create-mcp"
+Repository = "https://github.com/blaze-uz/create-mcp"
+Issues = "https://github.com/blaze-uz/create-mcp/issues"
+
+[project.scripts]
+create-mcp = "create_mcp.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.7",
+    "mypy>=1.13",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/create_mcp"]
+
+# Ship every template file (including the dot-* placeholders) inside the wheel.
+[tool.hatch.build.targets.sdist]
+include = ["src/create_mcp", "tests", "README.md", "LICENSE"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# The templates/ tree is rendered Jinja, not importable Python — don't lint it.
+extend-exclude = ["src/create_mcp/templates"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4"]
+
+[tool.ruff.lint.per-file-ignores]
+# Typer requires typer.Option/Argument calls in parameter defaults.
+"src/create_mcp/cli.py" = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+exclude = ["src/create_mcp/templates"]

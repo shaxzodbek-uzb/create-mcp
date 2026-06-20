@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1
+#
+# uv-based image for [[ project_name ]]. Builds the locked environment and runs
+# the MCP server over Streamable HTTP. (uv.lock is optional here — it is picked
+# up automatically if you have committed it, which is recommended.)
+FROM ghcr.io/astral-sh/uv:python[[ python_version ]]-bookworm-slim
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0
+
+WORKDIR /app
+
+# Install dependencies first for better layer caching.
+COPY pyproject.toml uv.lock* ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --no-dev --no-install-project
+
+# Then install the project itself.
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --no-dev
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    MCP_TRANSPORT=http \
+    MCP_HOST=0.0.0.0 \
+    MCP_PORT=8000
+
+EXPOSE 8000
+
+# Runs the console script defined in pyproject ([[ package_name ]]).
+CMD ["[[ package_name ]]"]

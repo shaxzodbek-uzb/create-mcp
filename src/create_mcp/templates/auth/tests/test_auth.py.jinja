@@ -1,0 +1,44 @@
+"""Tests for the OAuth 2.1 resource-server behaviour.
+
+These drive the ASGI app directly (via httpx's ASGITransport) so they are fast
+and deterministic — no real server, no network, no external identity provider.
+"""
+
+from __future__ import annotations
+
+import httpx
+import pytest
+from starlette.applications import Starlette
+
+from [[ package_name ]].server import mcp
+
+# RFC 9728 Protected Resource Metadata is served at the resource-path-aware
+# location; the MCP endpoint is mounted at /mcp.
+PRM_PATH = "/.well-known/oauth-protected-resource/mcp"
+
+
+@pytest.fixture
+def http_app() -> Starlette:
+    return mcp.http_app()
+
+
+async def test_protected_resource_metadata_is_served(http_app: Starlette) -> None:
+    transport = httpx.ASGITransport(app=http_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get(PRM_PATH)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["resource"]
+    assert data["authorization_servers"]
+
+
+async def test_unauthenticated_request_is_rejected(http_app: Starlette) -> None:
+    transport = httpx.ASGITransport(app=http_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+            headers={"Accept": "application/json, text/event-stream"},
+        )
+    assert response.status_code == 401
+    assert "WWW-Authenticate" in response.headers

@@ -1,0 +1,21 @@
+# Copy to .env and adjust. All variables are prefixed with MCP_.
+
+# Transport: "http" (Streamable HTTP, recommended for remote) or "stdio" (local).
+MCP_TRANSPORT=[% if http %]http[% else %]stdio[% endif %]
+
+# Network binding (only used for the http transport).
+MCP_HOST=127.0.0.1
+MCP_PORT=8000
+[% if auth_enabled %]
+
+# --- OAuth 2.1 resource server ------------------------------------------------
+# This server validates JWT access tokens issued by an external Authorization
+# Server (Keycloak, WorkOS AuthKit, Auth0, Microsoft Entra, ...). Point the
+# variables below at your identity provider. The defaults are placeholders that
+# let the server boot and serve discovery metadata, but real tokens will only
+# validate once these are correct.
+MCP_BASE_URL=http://localhost:8000
+MCP_OAUTH_ISSUER=https://auth.example.com
+MCP_OAUTH_JWKS_URI=https://auth.example.com/.well-known/jwks.json
+MCP_OAUTH_AUDIENCE=[[ project_name ]]
+[% endif %]

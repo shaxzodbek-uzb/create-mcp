@@ -1,0 +1,17 @@
+"""Console entrypoint: ``uv run [[ package_name ]]`` / ``python -m [[ package_name ]]``."""
+
+from __future__ import annotations
+
+from .server import mcp
+from .settings import settings
+
+
+def main() -> None:
+    if settings.transport == "stdio":
+        mcp.run()
+    else:
+        mcp.run(transport="http", host=settings.host, port=settings.port)
+
+
+if __name__ == "__main__":
+    main()

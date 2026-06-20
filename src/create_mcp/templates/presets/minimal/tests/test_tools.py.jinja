@@ -1,0 +1,25 @@
+"""Tests for the minimal preset's example tools."""
+
+from __future__ import annotations
+
+from fastmcp import Client, FastMCP
+
+
+async def test_add_returns_structured_sum(mcp_server: FastMCP) -> None:
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("add", {"a": 2, "b": 3})
+    assert result.data.total == 5
+    assert result.data.a == 2
+    assert result.data.b == 3
+
+
+async def test_greet(mcp_server: FastMCP) -> None:
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("greet", {"name": "Ada"})
+    assert result.data == "Hello, Ada!"
+
+
+async def test_server_info_resource(mcp_server: FastMCP) -> None:
+    async with Client(mcp_server) as client:
+        result = await client.read_resource("info://server")
+    assert "[[ project_name ]]" in result[0].text

@@ -1,0 +1,45 @@
+"""Tests for the agent-tools preset."""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from datetime import datetime
+
+import pytest
+from fastmcp import Client, FastMCP
+from fastmcp.exceptions import ToolError
+
+import [[ package_name ]].tools as tools_mod
+
+
+@pytest.fixture(autouse=True)
+def _clear_memory() -> Iterator[None]:
+    tools_mod._MEMORY.clear()
+    yield
+    tools_mod._MEMORY.clear()
+
+
+async def test_calculate_respects_precedence(mcp_server: FastMCP) -> None:
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("calculate", {"expression": "2 + 3 * 4"})
+    assert result.data == 14.0
+
+
+async def test_calculate_rejects_code(mcp_server: FastMCP) -> None:
+    async with Client(mcp_server) as client:
+        with pytest.raises(ToolError):
+            await client.call_tool("calculate", {"expression": "__import__('os')"})
+
+
+async def test_remember_then_recall(mcp_server: FastMCP) -> None:
+    async with Client(mcp_server) as client:
+        await client.call_tool("remember", {"key": "name", "value": "Ada"})
+        result = await client.call_tool("recall", {"key": "name"})
+    assert result.data == "Ada"
+
+
+async def test_current_time_is_iso8601(mcp_server: FastMCP) -> None:
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("current_time", {})
+    # Raises if not valid ISO 8601.
+    datetime.fromisoformat(result.data)

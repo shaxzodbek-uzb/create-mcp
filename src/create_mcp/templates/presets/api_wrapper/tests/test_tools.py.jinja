@@ -1,0 +1,29 @@
+"""Tests for the api-wrapper preset — the API call is mocked, so they run offline."""
+
+from __future__ import annotations
+
+from unittest.mock import AsyncMock
+
+import pytest
+from fastmcp import Client, FastMCP
+
+import [[ package_name ]].tools as tools_mod
+
+
+async def test_random_cat_fact(mcp_server: FastMCP, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        tools_mod,
+        "_get_json",
+        AsyncMock(return_value={"fact": "Cats sleep a lot.", "length": 17}),
+    )
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("random_cat_fact", {})
+    assert result.data.fact == "Cats sleep a lot."
+    assert result.data.length == 17
+
+
+async def test_get_json(mcp_server: FastMCP, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tools_mod, "_get_json", AsyncMock(return_value={"hello": "world"}))
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("get_json", {"url": "https://example.com"})
+    assert result.data == {"hello": "world"}

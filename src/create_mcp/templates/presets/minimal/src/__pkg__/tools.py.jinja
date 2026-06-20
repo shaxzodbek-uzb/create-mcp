@@ -1,0 +1,40 @@
+"""Tools, resources and prompts for [[ project_name ]].
+
+Everything is typed: parameter and return annotations become the MCP input/output
+schema automatically. Return a ``pydantic`` model for structured output.
+"""
+
+from __future__ import annotations
+
+from fastmcp import FastMCP
+from pydantic import BaseModel, Field
+
+
+class Sum(BaseModel):
+    """Structured result for the ``add`` tool."""
+
+    a: int
+    b: int
+    total: int = Field(description="a + b")
+
+
+def register(mcp: FastMCP) -> None:
+    @mcp.tool
+    def add(a: int, b: int) -> Sum:
+        """Add two integers and return a structured result."""
+        return Sum(a=a, b=b, total=a + b)
+
+    @mcp.tool
+    def greet(name: str) -> str:
+        """Greet someone by name."""
+        return f"Hello, {name}!"
+
+    @mcp.resource("info://server")
+    def server_info() -> dict[str, str]:
+        """A static resource describing this server."""
+        return {"name": "[[ project_name ]]", "scaffolded_with": "create-mcp"}
+
+    @mcp.prompt
+    def summarize(text: str) -> str:
+        """A reusable prompt template that asks the model to summarize text."""
+        return f"Summarize the following text in one sentence:\n\n{text}"

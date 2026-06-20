@@ -1,0 +1,73 @@
+"""Tools for [[ project_name ]] — a toolbox aimed at autonomous agents.
+
+Includes a safe calculator (no ``eval``), a key/value scratchpad the agent can
+use as working memory, and a clock. Replace or extend these with your own.
+"""
+
+from __future__ import annotations
+
+import ast
+import operator
+from collections.abc import Callable
+from datetime import UTC, datetime
+
+from fastmcp import FastMCP
+
+# In-process scratchpad. For multi-process deployments, back this with Redis/DB.
+_MEMORY: dict[str, str] = {}
+
+_BIN_OPS: dict[type[ast.operator], Callable[..., float]] = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+    ast.Pow: operator.pow,
+}
+_UNARY_OPS: dict[type[ast.unaryop], Callable[..., float]] = {
+    ast.UAdd: operator.pos,
+    ast.USub: operator.neg,
+}
+
+
+def _safe_eval(node: ast.AST) -> float:
+    if isinstance(node, ast.Expression):
+        return _safe_eval(node.body)
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+        return float(node.value)
+    if isinstance(node, ast.BinOp) and type(node.op) in _BIN_OPS:
+        return _BIN_OPS[type(node.op)](_safe_eval(node.left), _safe_eval(node.right))
+    if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY_OPS:
+        return _UNARY_OPS[type(node.op)](_safe_eval(node.operand))
+    raise ValueError("Unsupported expression")
+
+
+def register(mcp: FastMCP) -> None:
+    @mcp.tool
+    def calculate(expression: str) -> float:
+        """Evaluate an arithmetic expression safely (e.g. ``2 + 3 * 4``)."""
+        return _safe_eval(ast.parse(expression, mode="eval"))
+
+    @mcp.tool
+    def remember(key: str, value: str) -> str:
+        """Store a value in the agent's scratchpad memory."""
+        _MEMORY[key] = value
+        return f"Stored '{key}'."
+
+    @mcp.tool
+    def recall(key: str) -> str:
+        """Read a value back from the scratchpad (errors if the key is unknown)."""
+        if key not in _MEMORY:
+            raise ValueError(f"Nothing stored under '{key}'")
+        return _MEMORY[key]
+
+    @mcp.tool
+    def current_time() -> str:
+        """Return the current UTC time in ISO 8601 format."""
+        return datetime.now(UTC).isoformat()
+
+    @mcp.prompt
+    def plan(goal: str) -> str:
+        """Ask the model to break a goal into steps."""
+        return f"Break the following goal into a short, numbered plan:\n\n{goal}"

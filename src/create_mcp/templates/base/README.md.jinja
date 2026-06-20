@@ -1,0 +1,122 @@
+# [[ project_name ]]
+
+[[ description ]]
+
+Built with [FastMCP](https://gofastmcp.com) and scaffolded by
+[`create-mcp`](https://github.com/blaze-uz/create-mcp) — a production-ready
+[Model Context Protocol](https://modelcontextprotocol.io) server with tests, CI,
+typing, linting and Docker already wired up.
+
+## Quickstart
+
+```bash
+uv sync            # install dependencies
+uv run [[ package_name ]]    # start the server ([[ transport ]])
+uv run pytest      # run the tests
+```
+
+[% if http %]
+The server speaks **Streamable HTTP** and listens on `http://127.0.0.1:8000/mcp/`
+by default. Configure host/port/transport via environment variables (see
+[`.env.example`](./.env.example)).
+[% else %]
+The server speaks **stdio**, which is what local clients like Claude Desktop and
+Cursor expect. Switch to HTTP any time by setting `MCP_TRANSPORT=http` (see
+[`.env.example`](./.env.example)).
+[% endif %]
+
+## Connect a client
+
+### MCP Inspector
+
+```bash
+npx @modelcontextprotocol/inspector uv run [[ package_name ]]
+```
+
+### Claude Desktop / Cursor
+
+Add this to your client's MCP config:
+
+```json
+{
+  "mcpServers": {
+    "[[ package_name ]]": {
+      "command": "uv",
+      "args": ["run", "[[ package_name ]]"],
+      "cwd": "/absolute/path/to/[[ project_name ]]"
+    }
+  }
+}
+```
+[% if auth_enabled %]
+
+## Authentication
+
+This server is an **OAuth 2.1 resource server**. It validates JWT access tokens
+issued by an external Authorization Server and exposes the discovery metadata
+MCP clients need:
+
+- `GET /.well-known/oauth-protected-resource` — [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728)
+  Protected Resource Metadata advertising your trusted authorization server(s).
+- Unauthenticated requests receive `401` with a `WWW-Authenticate` challenge
+  that points clients at the metadata, so they can discover and complete the
+  OAuth flow automatically.
+
+Token validation (signature, issuer, audience, expiry) is configured in
+[`src/[[ package_name ]]/auth.py`](./src/[[ package_name ]]/auth.py) via FastMCP's
+`RemoteAuthProvider` + `JWTVerifier`. Set the `MCP_OAUTH_*` variables in `.env`
+to your provider — for example [Keycloak](https://www.keycloak.org),
+[WorkOS AuthKit](https://www.authkit.com), [Auth0](https://auth0.com) or
+Microsoft Entra ID. The scaffold ships the *resource* server; the authorization
+server is whichever IdP you point it at.
+[% endif %]
+
+## Docker
+
+```bash
+docker build -t [[ project_name ]] .
+docker run -p 8000:8000 [[ project_name ]]
+```
+
+## Project structure
+
+```
+[[ project_name ]]/
+├── src/[[ package_name ]]/
+│   ├── server.py      # the FastMCP instance (+ /health route[% if auth_enabled %] + auth[% endif %])
+│   ├── tools.py       # your tools, resources and prompts
+│   ├── settings.py    # typed configuration (pydantic-settings)
+│   ├── app.py         # FastAPI host that mounts MCP at /mcp
+[% if auth_enabled %]│   ├── auth.py        # OAuth 2.1 resource-server wiring
+[% endif %]│   └── __main__.py    # `uv run [[ package_name ]]` entrypoint
+├── tests/             # in-memory tests — no network required
+├── Dockerfile
+└── .github/workflows/ci.yml
+```
+
+## Adding tools
+
+Open `src/[[ package_name ]]/tools.py` and add a typed function:
+
+```python
+@mcp.tool
+def greet(name: str) -> str:
+    """Say hello."""
+    return f"Hello, {name}!"
+```
+
+Types become the tool's input schema automatically. Return a `pydantic` model
+for structured output. See the [FastMCP docs](https://gofastmcp.com/servers/tools).
+
+## Running alongside an existing API
+
+[`app.py`](./src/[[ package_name ]]/app.py) mounts the MCP server inside a FastAPI
+app, so you can serve your own REST routes next to it:
+
+```bash
+uv run uvicorn [[ package_name ]].app:api --host 0.0.0.0 --port 8000
+```
+
+---
+
+_Scaffolded with [`create-mcp`](https://github.com/blaze-uz/create-mcp) v[[ create_mcp_version ]]._

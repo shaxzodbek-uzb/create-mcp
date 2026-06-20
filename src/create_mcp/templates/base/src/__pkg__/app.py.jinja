@@ -1,0 +1,31 @@
+"""FastAPI host that mounts the MCP server at ``/mcp``.
+
+This lets you serve your own REST endpoints alongside the MCP server on the same
+process and port. Run it with:
+
+    uv run uvicorn [[ package_name ]].app:api --host 0.0.0.0 --port 8000
+
+The MCP endpoint is then available at ``/mcp/`` and your REST routes live next to
+it. (For the plain MCP server without FastAPI, just use ``uv run [[ package_name ]]``.)
+"""
+
+from __future__ import annotations
+
+from fastapi import FastAPI
+
+from .server import mcp
+
+# Create the MCP ASGI app with path="/" because we mount it at /mcp below.
+mcp_app = mcp.http_app(path="/")
+
+# The MCP session manager runs in the app lifespan; FastAPI must adopt it.
+api = FastAPI(title="[[ project_name ]]", lifespan=mcp_app.lifespan)
+
+
+@api.get("/healthz")
+async def healthz() -> dict[str, str]:
+    """A regular FastAPI route, served beside the MCP server."""
+    return {"status": "ok"}
+
+
+api.mount("/mcp", mcp_app)

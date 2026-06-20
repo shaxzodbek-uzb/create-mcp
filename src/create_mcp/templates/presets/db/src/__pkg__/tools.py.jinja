@@ -1,0 +1,79 @@
+"""Tools for [[ project_name ]] — a SQLite-backed store exposed as MCP tools.
+
+A connection is opened per call against ``MCP_DATABASE_PATH`` (default ``data.db``),
+so there is no shared connection state to manage. Swap SQLite for your real
+database by changing :func:`_connect`.
+"""
+
+from __future__ import annotations
+
+import os
+import sqlite3
+
+from fastmcp import FastMCP
+from pydantic import BaseModel
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS notes (
+    id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    body  TEXT NOT NULL DEFAULT ''
+)
+"""
+
+
+class Note(BaseModel):
+    id: int
+    title: str
+    body: str
+
+
+def _db_path() -> str:
+    return os.environ.get("MCP_DATABASE_PATH", "data.db")
+
+
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(_db_path())
+    conn.row_factory = sqlite3.Row
+    conn.execute(_SCHEMA)
+    return conn
+
+
+def register(mcp: FastMCP) -> None:
+    @mcp.tool
+    def add_note(title: str, body: str = "") -> Note:
+        """Create a note and return it."""
+        conn = _connect()
+        try:
+            cursor = conn.execute("INSERT INTO notes (title, body) VALUES (?, ?)", (title, body))
+            conn.commit()
+            row = conn.execute(
+                "SELECT id, title, body FROM notes WHERE id = ?", (cursor.lastrowid,)
+            ).fetchone()
+            return Note(**dict(row))
+        finally:
+            conn.close()
+
+    @mcp.tool
+    def list_notes() -> list[Note]:
+        """Return all notes, oldest first."""
+        conn = _connect()
+        try:
+            rows = conn.execute("SELECT id, title, body FROM notes ORDER BY id").fetchall()
+            return [Note(**dict(row)) for row in rows]
+        finally:
+            conn.close()
+
+    @mcp.tool
+    def get_note(note_id: int) -> Note:
+        """Fetch a single note by id (errors if it does not exist)."""
+        conn = _connect()
+        try:
+            row = conn.execute(
+                "SELECT id, title, body FROM notes WHERE id = ?", (note_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"Note {note_id} not found")
+            return Note(**dict(row))
+        finally:
+            conn.close()

@@ -1,0 +1,41 @@
+"""Tools for [[ project_name ]] — wrapping an existing HTTP/JSON API as MCP tools.
+
+The network call is isolated in :func:`_get_json` so it is trivial to mock in
+tests (see ``tests/test_tools.py``). Swap ``catfact.ninja`` for your own API.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+import httpx
+from fastmcp import FastMCP
+from pydantic import BaseModel
+
+CATFACT_URL = "https://catfact.ninja/fact"
+
+
+class CatFact(BaseModel):
+    fact: str
+    length: int
+
+
+async def _get_json(url: str) -> dict[str, Any]:
+    """GET ``url`` and return the parsed JSON body. Mock this in tests."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.get(url)
+        response.raise_for_status()
+        return response.json()
+
+
+def register(mcp: FastMCP) -> None:
+    @mcp.tool
+    async def random_cat_fact() -> CatFact:
+        """Fetch a random cat fact (an example of wrapping a public API)."""
+        data = await _get_json(CATFACT_URL)
+        return CatFact(fact=data["fact"], length=data["length"])
+
+    @mcp.tool
+    async def get_json(url: str) -> dict[str, Any]:
+        """GET any URL and return its JSON body."""
+        return await _get_json(url)

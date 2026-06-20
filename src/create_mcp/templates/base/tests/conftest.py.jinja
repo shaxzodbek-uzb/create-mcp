@@ -1,0 +1,18 @@
+"""Shared test fixtures.
+
+Tests use FastMCP's in-memory transport: the client talks to the server object
+directly, with no network. See https://gofastmcp.com/development/tests
+"""
+
+from __future__ import annotations
+
+import pytest
+from fastmcp import FastMCP
+
+from [[ package_name ]].server import mcp
+
+
+@pytest.fixture
+def mcp_server() -> FastMCP:
+    """The server under test. (Don't open a Client here — do it in each test.)"""
+    return mcp

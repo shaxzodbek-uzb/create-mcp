@@ -1,0 +1,29 @@
+"""Tests for the db preset — each test gets a fresh temporary SQLite database."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from fastmcp import Client, FastMCP
+from fastmcp.exceptions import ToolError
+
+
+@pytest.fixture(autouse=True)
+def _temp_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MCP_DATABASE_PATH", str(tmp_path / "test.db"))
+
+
+async def test_add_then_list_notes(mcp_server: FastMCP) -> None:
+    async with Client(mcp_server) as client:
+        created = await client.call_tool("add_note", {"title": "First", "body": "hello"})
+        assert created.data.title == "First"
+        listed = await client.call_tool("list_notes", {})
+    assert len(listed.data) == 1
+    assert listed.data[0].title == "First"
+
+
+async def test_get_missing_note_errors(mcp_server: FastMCP) -> None:
+    async with Client(mcp_server) as client:
+        with pytest.raises(ToolError):
+            await client.call_tool("get_note", {"note_id": 424242})

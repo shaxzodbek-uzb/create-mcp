@@ -1,0 +1,19 @@
+"""Smoke tests that hold for every preset."""
+
+from __future__ import annotations
+
+from fastmcp import Client, FastMCP
+
+
+async def test_server_responds_to_ping(mcp_server: FastMCP) -> None:
+    async with Client(mcp_server) as client:
+        assert await client.ping() is True
+
+
+async def test_server_exposes_at_least_one_tool(mcp_server: FastMCP) -> None:
+    async with Client(mcp_server) as client:
+        tools = await client.list_tools()
+    assert len(tools) >= 1
+    for tool in tools:
+        assert tool.name
+        assert tool.inputSchema is not None

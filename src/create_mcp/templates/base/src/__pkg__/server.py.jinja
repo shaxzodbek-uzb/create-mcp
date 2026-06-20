@@ -1,0 +1,30 @@
+"""The [[ project_name ]] MCP server."""
+
+from __future__ import annotations
+
+from fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse
+
+from . import tools
+[% if auth_enabled %]
+from .auth import build_auth
+from .settings import settings
+[% endif %]
+
+[% if auth_enabled %]
+_auth = build_auth(settings)
+[% else %]
+_auth = None
+[% endif %]
+
+mcp: FastMCP = FastMCP(name="[[ project_name ]]", auth=_auth)
+
+# Register the tools / resources / prompts for this server.
+tools.register(mcp)
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health(_request: Request) -> PlainTextResponse:
+    """Liveness probe (unauthenticated), available over the HTTP transport."""
+    return PlainTextResponse("ok")
