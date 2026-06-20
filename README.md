@@ -17,22 +17,9 @@ One command scaffolds a typed, tested, auth-ready Python [MCP](https://modelcont
 uvx create-mcp my-server
 ```
 
-<!-- A terminal recording (vhs / asciinema) can replace this block before launch. -->
-
-```text
-$ uvx create-mcp
-  Project name: pay-tools
-  Preset:       minimal
-  Transport:    streamable-http
-  Auth:         oauth
-
-  ✓ Scaffolded pay-tools (Minimal · streamable-http · auth: oauth)
-
-  cd pay-tools
-  uv sync            # install dependencies
-  uv run pay_tools   # start the server
-  uv run pytest      # green ✓
-```
+<p align="center">
+  <img src="docs/demo.svg" alt="create-mcp — scaffold a production MCP server in one command, with tests green out of the box" width="760">
+</p>
 
 ## Why
 
