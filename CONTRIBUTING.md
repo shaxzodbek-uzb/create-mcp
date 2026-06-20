@@ -6,7 +6,7 @@ rule is: **the generated projects must always be green.**
 ## Development setup
 
 ```bash
-git clone https://github.com/blaze-uz/create-mcp
+git clone https://github.com/shaxzodbek-uzb/create-mcp
 cd create-mcp
 uv sync
 uv run create-mcp demo --preset minimal --yes -o /tmp   # try it

@@ -6,7 +6,7 @@
 
 One command scaffolds a typed, tested, auth-ready Python [MCP](https://modelcontextprotocol.io) server you can *ship* — not just run.
 
-[![CI](https://github.com/blaze-uz/create-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/blaze-uz/create-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/shaxzodbek-uzb/create-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/shaxzodbek-uzb/create-mcp/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/create-mcp.svg)](https://pypi.org/project/create-mcp/)
 [![Python](https://img.shields.io/pypi/pyversions/create-mcp.svg)](https://pypi.org/project/create-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
