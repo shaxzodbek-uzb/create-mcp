@@ -115,4 +115,4 @@ type-checking and testing it — so the templates can't rot silently.
 
 ## License
 
-MIT © [Blaze](https://blaze.uz)
+MIT © Shaxzodbek Qambaraliyev / [Blaze](https://blaze.uz)
