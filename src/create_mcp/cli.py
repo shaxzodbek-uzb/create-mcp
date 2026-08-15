@@ -14,7 +14,8 @@ from rich.text import Text
 
 from . import FASTMCP_TARGET, __version__
 from .generator import GeneratorError, ProjectConfig, generate, to_package_name
-from .presets import DEFAULT_PRESET, PRESETS, preset_choices
+from .openapi import CROWDED_TOOL_COUNT, ApiSpec, OpenAPIError, load_spec
+from .presets import DEFAULT_PRESET, OPENAPI_PRESET, PRESETS, preset_choices
 
 console = Console()
 err_console = Console(stderr=True)
@@ -71,10 +72,46 @@ def _prompt_choice(label: str, choices: list[str], default: str) -> str:
     return Prompt.ask(f"[bold]{label}[/bold]", choices=choices, default=default)
 
 
+def _load_api(source: str, tags: list[str] | None) -> ApiSpec:
+    """Parse the OpenAPI document, reporting problems as CLI errors rather than tracebacks."""
+    try:
+        api = load_spec(source, tags=tags)
+    except OpenAPIError as exc:
+        err_console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(code=2) from exc
+
+    label = f"{api.title} {api.version}".strip()
+    console.print(f"  [green]✓[/green] parsed [bold]{label}[/bold] — {len(api.operations)} tools")
+    if api.filtered_out:
+        console.print(f"  [dim]›[/dim] {api.filtered_out} operation(s) excluded by --openapi-tag")
+    if len(api.operations) > CROWDED_TOOL_COUNT:
+        # Long tool lists eat the model's context and measurably hurt tool selection.
+        console.print(
+            f"  [yellow]›[/yellow] {len(api.operations)} tools is a lot for one MCP server. "
+            "Narrow it with --openapi-tag, or delete the ones you don't need from tools.py."
+        )
+    if not api.base_url:
+        console.print(
+            "  [yellow]›[/yellow] the document declares no server URL — "
+            "set API_BASE_URL before running the server"
+        )
+    return api
+
+
 def create(  # noqa: C901 - the CLI orchestration is intentionally linear
     project_name: str = typer.Argument(None, help="Name of the project / directory to create."),
     preset: str = typer.Option(
         None, "--preset", "-p", help=f"Preset: {', '.join(preset_choices())}."
+    ),
+    from_openapi: str = typer.Option(
+        None,
+        "--from-openapi",
+        help="Generate one typed tool per operation from an OpenAPI file or URL.",
+    ),
+    openapi_tag: list[str] = typer.Option(
+        None,
+        "--openapi-tag",
+        help="Only include operations with this OpenAPI tag (repeatable).",
     ),
     transport: str = typer.Option(
         None, "--transport", "-t", help="Transport: streamable-http or stdio."
@@ -120,6 +157,17 @@ def create(  # noqa: C901 - the CLI orchestration is intentionally linear
             err_console.print("[red]error:[/red] project name is required with --yes")
             raise typer.Exit(code=2)
 
+    api: ApiSpec | None = None
+    if from_openapi:
+        if preset not in (None, OPENAPI_PRESET):
+            err_console.print(
+                f"[red]error:[/red] --from-openapi generates the {OPENAPI_PRESET!r} preset; "
+                f"drop --preset {preset}"
+            )
+            raise typer.Exit(code=2)
+        preset = OPENAPI_PRESET
+        api = _load_api(from_openapi, openapi_tag or None)
+
     preset = choose("Preset", preset_choices(), DEFAULT_PRESET, preset)
     transport = choose("Transport", TRANSPORTS, "streamable-http", transport)
     auth = choose("Auth", AUTH_MODES, "none", auth)
@@ -136,7 +184,8 @@ def create(  # noqa: C901 - the CLI orchestration is intentionally linear
             preset=preset,
             transport=transport,
             auth=auth,
-            description=description or "",
+            description=description or (f"MCP tools for the {api.title} API." if api else ""),
+            api=api,
         )
         if package_name:
             # Validate + override the derived package name.
@@ -178,6 +227,17 @@ def _print_next_steps(config: ProjectConfig, target: Path, output_dir: Path) -> 
     body.append("# run the test suite\n\n", style="dim")
     body.append("Inspect it with the MCP Inspector:\n")
     body.append(f"  npx @modelcontextprotocol/inspector uv run {pkg}\n", style="cyan")
+    if config.api is not None:
+        body.append("\nGenerated from OpenAPI. ", style="bold yellow")
+        body.append("Set the API's base URL and credentials in .env:\n")
+        body.append(
+            f"  API_BASE_URL={config.api.base_url or '<your api base url>'}\n", style="cyan"
+        )
+        if config.api.auth_kind == "bearer":
+            body.append("  API_TOKEN=<token>\n", style="cyan")
+        elif config.api.auth_kind == "api_key":
+            body.append(f"  API_KEY=<key>          # sent as {config.api.api_key_name}\n", "cyan")
+        body.append("Then prune tools.py down to the operations you actually want to expose.")
     if config.auth_enabled:
         body.append("\nAuth is on. ", style="bold yellow")
         body.append("Set OAUTH_* vars in .env (see .env.example) and point them at\n")

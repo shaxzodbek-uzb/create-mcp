@@ -1,0 +1,47 @@
+"""Tests for the tools generated from the [[ api_title ]] OpenAPI document.
+
+``_request`` is patched, so these run offline and in milliseconds — no API key, no
+network, no rate limit. Add real assertions per operation as you tighten them up.
+"""
+
+from __future__ import annotations
+
+from unittest.mock import AsyncMock
+
+import pytest
+from fastmcp import Client, FastMCP
+
+import [[ package_name ]].tools as tools_mod
+
+EXPECTED_TOOLS = {
+[% for op in operations %]
+    "[[ op.tool_name ]]",
+[% endfor %]
+}
+
+
+async def test_every_operation_is_registered(mcp_server: FastMCP) -> None:
+    async with Client(mcp_server) as client:
+        registered = {tool.name for tool in await client.list_tools()}
+    assert registered >= EXPECTED_TOOLS
+
+
+async def test_tool_calls_the_expected_endpoint(
+    mcp_server: FastMCP, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The first operation reaches `_request` with the method and path from the spec."""
+    request = AsyncMock(return_value={"ok": True})
+    monkeypatch.setattr(tools_mod, "_request", request)
+
+    async with Client(mcp_server) as client:
+        await client.call_tool(
+            "[[ operations[0].tool_name ]]", [[ operations[0].sample_arguments ]]
+        )
+
+    assert request.await_count == 1
+    assert request.await_args.args == ("[[ operations[0].method ]]", "[[ operations[0].path ]]")
+
+
+def test_base_url_has_no_trailing_slash() -> None:
+    """`_request` concatenates BASE_URL and a path that already starts with '/'."""
+    assert not tools_mod.BASE_URL.endswith("/")

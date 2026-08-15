@@ -19,6 +19,9 @@ class Preset:
     description: str
     # Extra runtime dependencies the generated project needs for this preset.
     extra_dependencies: tuple[str, ...] = field(default_factory=tuple)
+    # Hidden presets need input the interactive prompt can't collect (a spec file),
+    # so they are reachable by flag only and stay out of the menu.
+    hidden: bool = False
 
 
 PRESETS: dict[str, Preset] = {
@@ -43,9 +46,17 @@ PRESETS: dict[str, Preset] = {
         title="Agent tools",
         description="A toolbox for autonomous agents: calculator, scratchpad memory, clock.",
     ),
+    "openapi": Preset(
+        key="openapi",
+        title="From OpenAPI",
+        description="One typed tool per operation, generated from an OpenAPI document.",
+        extra_dependencies=("httpx>=0.27",),
+        hidden=True,
+    ),
 }
 
 DEFAULT_PRESET = "minimal"
+OPENAPI_PRESET = "openapi"
 
 
 def preset_dirname(key: str) -> str:
@@ -54,4 +65,5 @@ def preset_dirname(key: str) -> str:
 
 
 def preset_choices() -> list[str]:
-    return list(PRESETS)
+    """Presets a user can pick interactively (hidden ones need a flag)."""
+    return [key for key, preset in PRESETS.items() if not preset.hidden]

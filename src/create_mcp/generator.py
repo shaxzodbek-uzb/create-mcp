@@ -22,7 +22,8 @@ import jinja2
 
 from . import FASTMCP_TARGET, __version__
 from . import templates as _templates
-from .presets import PRESETS, preset_dirname
+from .openapi import ApiSpec
+from .presets import OPENAPI_PRESET, PRESETS, preset_dirname
 
 TEMPLATES_DIR = Path(_templates.__file__).parent
 
@@ -42,6 +43,8 @@ class ProjectConfig:
     description: str = ""
     author: str = ""
     python_version: str = "3.11"
+    #: Parsed OpenAPI document; required by — and only used by — the ``openapi`` preset.
+    api: ApiSpec | None = None
 
     # Derived / filled in __post_init__.
     package_name: str = field(default="", init=False)
@@ -51,6 +54,11 @@ class ProjectConfig:
         if self.preset not in PRESETS:
             raise GeneratorError(
                 f"Unknown preset {self.preset!r}. Choose from: {', '.join(PRESETS)}"
+            )
+        if self.preset == OPENAPI_PRESET and self.api is None:
+            raise GeneratorError(
+                f"The {OPENAPI_PRESET!r} preset is generated from a specification. "
+                "Pass --from-openapi <file-or-url>."
             )
         if self.transport not in ("streamable-http", "stdio"):
             raise GeneratorError(f"Unknown transport {self.transport!r}.")
@@ -70,7 +78,26 @@ class ProjectConfig:
     @property
     def context(self) -> dict[str, object]:
         """The variables exposed to templates."""
+        api: dict[str, object] = {}
+        if self.api is not None:
+            api = {
+                "api_title": self.api.title,
+                "api_version": self.api.version,
+                "api_base_url": self.api.base_url,
+                "api_auth_kind": self.api.auth_kind,
+                "api_key_name": self.api.api_key_name,
+                "api_key_location": self.api.api_key_location,
+                # Pre-rendered so the template needs no inline conditional: an
+                # unused `Literal` import would fail the generated project's own lint.
+                "api_typing_import": (
+                    "from typing import Any, Literal"
+                    if self.api.uses_literal
+                    else "from typing import Any"
+                ),
+                "operations": self.api.operations,
+            }
         return {
+            **api,
             "project_name": self.project_name,
             "package_name": self.package_name,
             "preset": self.preset,
