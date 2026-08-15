@@ -1,0 +1,135 @@
+"""Tools for [[ project_name ]] — generated from the [[ api_title ]] OpenAPI document.
+
+One tool per operation. Every HTTP call goes through :func:`_request`, so the whole
+module can be exercised offline by patching that single function (see
+``tests/test_tools.py``).
+
+This file is a **starting point, not a lock-in**: it is ordinary Python, so delete the
+operations you don't want to expose, tighten a return type, or add validation. A smaller,
+sharper tool list makes a model pick better — resist shipping all of them just because
+they generated.
+
+Configuration (environment, or .env):
+
+    API_BASE_URL   base URL of the API (default: [[ api_base_url or "unset — you must set it" ]])
+[% if api_auth_kind == "bearer" %]
+    API_TOKEN      sent as `Authorization: Bearer <token>`
+[% elif api_auth_kind == "api_key" %]
+    API_KEY        sent as the `[[ api_key_name ]]` [[ api_key_location ]]
+[% endif %]
+    API_TIMEOUT    per-request timeout in seconds (default: 30)
+"""
+
+from __future__ import annotations
+
+import os
+[[ api_typing_import ]]
+
+import httpx
+from fastmcp import FastMCP
+
+BASE_URL = os.environ.get("API_BASE_URL", "[[ api_base_url ]]").rstrip("/")
+[% if api_auth_kind == "bearer" %]
+API_TOKEN = os.environ.get("API_TOKEN", "")
+[% elif api_auth_kind == "api_key" %]
+API_KEY = os.environ.get("API_KEY", "")
+[% endif %]
+TIMEOUT = float(os.environ.get("API_TIMEOUT", "30"))
+
+
+def _compact(values: dict[str, Any]) -> dict[str, Any]:
+    """Drop unset optional arguments so they aren't sent as literal nulls."""
+    return {key: value for key, value in values.items() if value is not None}
+
+
+async def _request(
+    method: str,
+    path: str,
+    *,
+    path_params: dict[str, Any] | None = None,
+    query: dict[str, Any] | None = None,
+    headers: dict[str, Any] | None = None,
+    json_body: Any = None,
+) -> Any:
+    """Perform one API call and return the decoded body.
+
+    Patch this in tests; every tool below routes through it.
+    """
+    if not BASE_URL:
+        raise RuntimeError(
+            "API_BASE_URL is not set. The OpenAPI document declared no server URL, "
+            "so the base URL has to come from the environment."
+        )
+
+    url = BASE_URL + path.format(**(path_params or {}))
+    request_headers = {str(k): str(v) for k, v in _compact(headers or {}).items()}
+[% if api_auth_kind == "bearer" %]
+    if API_TOKEN:
+        request_headers["Authorization"] = f"Bearer {API_TOKEN}"
+[% elif api_auth_kind == "api_key" and api_key_location == "header" %]
+    if API_KEY:
+        request_headers["[[ api_key_name ]]"] = API_KEY
+[% endif %]
+
+    request_query = _compact(query or {})
+[% if api_auth_kind == "api_key" and api_key_location == "query" %]
+    if API_KEY:
+        request_query["[[ api_key_name ]]"] = API_KEY
+[% endif %]
+
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        response = await client.request(
+            method,
+            url,
+            params=request_query,
+            headers=request_headers,
+            json=json_body or None,
+        )
+        response.raise_for_status()
+
+    if not response.content:
+        return {}
+    try:
+        return response.json()
+    except ValueError:
+        # Not every 200 is JSON — hand back the text rather than raising.
+        return {"text": response.text}
+
+
+def register(mcp: FastMCP) -> None:
+[% for op in operations %]
+    @mcp.tool
+    async def [[ op.tool_name ]]([[ op.signature_rendered ]]) -> Any:
+[% if op.doc_lines | length == 1 %]
+        """[[ op.doc_lines[0] ]]"""
+[% else %]
+        """[[ op.doc_lines[0] ]]
+[% for line in op.doc_lines[1:] %]
+[% if line %]
+        [[ line ]]
+[% else %]
+
+[% endif %]
+[% endfor %]
+        """
+[% endif %]
+        return await _request(
+            "[[ op.method ]]",
+            "[[ op.path ]]",
+[% if op.by_location("path") %]
+            path_params={[% for p in op.by_location("path") %]"[[ p.wire_name ]]": [[ p.name ]][% if not loop.last %], [% endif %][% endfor %]},
+[% endif %]
+[% if op.by_location("query") %]
+            query={[% for p in op.by_location("query") %]"[[ p.wire_name ]]": [[ p.name ]][% if not loop.last %], [% endif %][% endfor %]},
+[% endif %]
+[% if op.by_location("header") %]
+            headers={[% for p in op.by_location("header") %]"[[ p.wire_name ]]": [[ p.name ]][% if not loop.last %], [% endif %][% endfor %]},
+[% endif %]
+[% if op.opaque_body %]
+            json_body=[[ op.by_location("body")[0].name ]],
+[% elif op.by_location("body") %]
+            json_body=_compact({[% for p in op.by_location("body") %]"[[ p.wire_name ]]": [[ p.name ]][% if not loop.last %], [% endif %][% endfor %]}),
+[% endif %]
+        )
+
+[% endfor %]

@@ -19,3 +19,6 @@ uv.lock
 .idea/
 .vscode/
 .DS_Store
+
+# uv
+uv.lock

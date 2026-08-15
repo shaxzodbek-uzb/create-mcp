@@ -11,7 +11,7 @@ from create_mcp.generator import (
     render_to_mapping,
     to_package_name,
 )
-from create_mcp.presets import PRESETS
+from create_mcp.presets import PRESETS, preset_choices
 
 
 @pytest.mark.parametrize(
@@ -63,11 +63,16 @@ def test_auth_files_only_present_with_oauth() -> None:
     assert "pyjwt" in with_auth["pyproject.toml"]
 
 
-@pytest.mark.parametrize("preset", list(PRESETS))
+@pytest.mark.parametrize("preset", preset_choices())
 def test_every_preset_renders(preset: str) -> None:
     files = render_to_mapping(ProjectConfig(project_name="demo", preset=preset))
     assert "src/demo/tools.py" in files
     assert "def register(" in files["src/demo/tools.py"]
+
+
+def test_preset_choices_cover_every_visible_preset() -> None:
+    """A preset is either offered interactively or hidden behind its own flag."""
+    assert set(preset_choices()) == {k for k, p in PRESETS.items() if not p.hidden}
 
 
 def test_stdio_transport_in_settings() -> None:
